@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Training Log</title>
+  </head>
+  <body>
+    <h1>Training Log</h1>
+
+    <!-- Form to input workout details -->
+    <form id="trainingForm">
+      <label for="distance">Distance (m):</label>
+      <input type="number" placeholder="distance (m)" id="distance" required /><br />
+
+      <label for="time">Time (min):</label>
+      <input type="number" placeholder="hours" id="hours" value="0" required />: <input type="number" placeholder="minutes" id="minutes" value="0" required />: <input type="number" placeholder="seconds" id="seconds" value="0" required />.
+      <input type="number" placeholder="tenths" id="tenths" value="0" required />
+      <br />
+      <label for="intensity">Intensity:</label>
+      <label><input type="radio" name="intensity" value="UT3" required /> UT3</label>
+      <label><input type="radio" name="intensity" value="UT2" required /> UT2</label>
+      <label><input type="radio" name="intensity" value="UT1" required /> UT1</label>
+      <label><input type="radio" name="intensity" value="AT" required /> AT</label>
+      <label><input type="radio" name="intensity" value="TR" required /> TR</label>
+      <label><input type="radio" name="intensity" value="AN" required /> AN</label><br />
+
+      <label for="comments">Comments:</label>
+      <textarea id="comments"></textarea><br />
+
+      <button type="button" onclick="addWorkout()">Add Workout</button>
+    </form>
+
+    <!-- List of workouts in chronological order -->
+    <h2>Workouts</h2>
+    <ul id="workoutList"></ul>
+
+    <!-- Bin section for deleted workouts -->
+    <h2>Bin</h2>
+    <ul id="binList"></ul>
+
+    <script>
+      function calculateSplitTime(totalTimeInSeconds, distanceInMeters) {
+        // Calculate split time in seconds per 500 meters
+        const splitTimeInSeconds = totalTimeInSeconds / (distanceInMeters / 500);
+
+        // Extract minutes, seconds, and tenths
+        const minutes = Math.floor(splitTimeInSeconds / 60);
+        const seconds = Math.floor(splitTimeInSeconds % 60);
+        const tenths = Math.round((splitTimeInSeconds - Math.floor(splitTimeInSeconds)) * 10);
+
+        // Format the result as a string (mm:ss.t)
+        const splitTimeString = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}.${tenths}`;
+
+        return splitTimeString;
+      }
+      document.addEventListener("DOMContentLoaded", function () {
+        // Load workouts and bin from local storage
+        loadWorkouts();
+        loadBin();
+
+        // Function to add a new workout
+        window.addWorkout = function () {
+          const distance = document.getElementById("distance").value;
+          const hours = document.getElementById("hours").value;
+          const minutes = document.getElementById("minutes").value;
+          const seconds = document.getElementById("seconds").value;
+          const tenths = document.getElementById("tenths").value;
+          const time = `${hours}:${minutes}:${seconds}.${tenths}`;
+          const totalTimeInSeconds = hours * 3600 + minutes * 60 + seconds * 1 + tenths * 0.1;
+          const split = calculateSplitTime(totalTimeInSeconds, distance);
+          const intensity = document.querySelector('input[name="intensity"]:checked').value;
+          const comments = document.getElementById("comments").value;
+
+          if (distance && time && intensity) {
+            const workout = {
+              distance,
+              time,
+              intensity,
+              comments,
+              split,
+              date: new Date().toLocaleDateString("en-GB"),
+            };
+
+            // Add workout to the beginning of the workout list
+            const workouts = JSON.parse(localStorage.getItem("workouts")) || [];
+            workouts.unshift(workout);
+            localStorage.setItem("workouts", JSON.stringify(workouts));
+
+            // Reload workouts and clear form
+            loadWorkouts();
+            document.getElementById("trainingForm").reset();
+          }
+        };
+
+        // Function to delete a workout
+        window.deleteWorkout = function (index) {
+          const workouts = JSON.parse(localStorage.getItem("workouts")) || [];
+          const deletedWorkout = workouts.splice(index, 1)[0];
+
+          // Add deleted workout to the bin
+          const bin = JSON.parse(localStorage.getItem("bin")) || [];
+          bin.unshift(deletedWorkout);
+          localStorage.setItem("bin", JSON.stringify(bin));
+
+          // Update workouts list
+          localStorage.setItem("workouts", JSON.stringify(workouts));
+          loadWorkouts();
+          loadBin();
+        };
+
+        // Function to recover a workout from the bin
+        window.recoverWorkout = function (index) {
+          const bin = JSON.parse(localStorage.getItem("bin")) || [];
+          const recoveredWorkout = bin.splice(index, 1)[0];
+
+          // Add recovered workout back to workouts
+          const workouts = JSON.parse(localStorage.getItem("workouts")) || [];
+          workouts.unshift(recoveredWorkout);
+          localStorage.setItem("workouts", JSON.stringify(workouts));
+
+          // Update bin list
+          localStorage.setItem("bin", JSON.stringify(bin));
+          loadWorkouts();
+          loadBin();
+        };
+
+        // Function to permanently delete a workout from the bin
+        window.deleteFromBin = function (index) {
+          const bin = JSON.parse(localStorage.getItem("bin")) || [];
+          bin.splice(index, 1);
+
+          // Update bin list
+          localStorage.setItem("bin", JSON.stringify(bin));
+          loadBin();
+        };
+
+        // Function to load workouts into the UI
+        function loadWorkouts() {
+          const workouts = JSON.parse(localStorage.getItem("workouts")) || [];
+          const workoutList = document.getElementById("workoutList");
+          workoutList.innerHTML = "";
+
+          workouts.forEach((workout, index) => {
+            const listItem = document.createElement("li");
+            listItem.innerHTML = `${workout.date} - Distance: ${workout.distance} m, Time: ${workout.time}, Split: ${workout.split}, Intensity: ${workout.intensity}, Comments: ${workout.comments}`;
+            listItem.innerHTML += `<button onclick="deleteWorkout(${index})">Delete</button>`;
+            workoutList.appendChild(listItem);
+          });
+        }
+
+        // Function to load deleted workouts into the bin UI
+        function loadBin() {
+          const bin = JSON.parse(localStorage.getItem("bin")) || [];
+          const binList = document.getElementById("binList");
+          binList.innerHTML = "";
+
+          bin.forEach((workout, index) => {
+            const listItem = document.createElement("li");
+            listItem.innerHTML = `${workout.date} - Distance: ${workout.distance} m, Time: ${workout.time}, Split: ${workout.split}, Intensity: ${workout.intensity}, Comments: ${workout.comments}`;
+            listItem.innerHTML += `<button onclick="recoverWorkout(${index})">Recover</button>`;
+            listItem.innerHTML += `<button onclick="deleteFromBin(${index})">Permanently Delete</button>`;
+            binList.appendChild(listItem);
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
